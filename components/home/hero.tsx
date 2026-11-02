@@ -1,265 +1,535 @@
 "use client";
 
-import { motion } from "framer-motion";
 import Image from "next/image";
+import Link from "next/link";
 import {
-  Phone,
-  CalendarCheck,
-  ShieldCheck,
-  Award,
-  Star,
-  Sparkles,
-  Scissors,
-  Zap,
-  Quote,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useSpring,
+  useTransform,
+  type MotionValue,
+} from "framer-motion";
+import { ArrowUpRight, Clock, MapPin, Phone } from "lucide-react";
 import { SITE_CONFIG } from "@/data/site-config";
 
-const TRUST_ITEMS = [
-  { icon: ShieldCheck, label: "D.V.D Dermatologist" },
-  { icon: Award, label: "50,000+ Happy Patients" },
-  { icon: Sparkles, label: "Advanced Laser Technology" },
+/**
+ * Hero — "live" composition in the logo's navy / teal / cyan palette.
+ * Gentle ambient motion with pointer parallax; all motion is disabled when
+ * the visitor prefers reduced motion.
+ *
+ * Content is informational only (NMC ethical advertising guidelines,
+ * 6 Oct 2026): no testimonials, ratings, statistics, superiority or outcome
+ * claims, offers, patient images or doctor photograph.
+ *
+ * ACTIONS BEFORE PUBLISHING (see CLINIC_FACTS below):
+ *  1. Set LOGO_SRC to your logo file in /public.
+ *  2. Fill `qualifications` and `registration` ONLY with details verified
+ *     against the doctor's registration documents. Empty = not shown.
+ *  3. Fill `address` with the confirmed full address. Empty = city only.
+ *  4. Have the clinic confirm `hours` and `closedDay` in writing.
+ *  5. Record written clinic approval of the hero text, including STEPS.
+ */
+const LOGO_SRC = "/images/logo.png";
+
+const CLINIC_FACTS = {
+  doctorName: "Dr. Anand Patil",
+  /** Verified, recognised qualification text exactly as on the registration certificate. */
+  qualifications: "",
+  /** Verified State Medical Council registration, e.g. "Maharashtra Medical Council – Reg. No. 00000". */
+  registration: "",
+  /** Confirmed full address of the clinic. */
+  address: "",
+  /** Existing site values — pending clinic confirmation. */
+  hours: "11:00 AM – 6:00 PM",
+  closedDay: "Sunday closed",
+};
+
+const focusRing =
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#7FE0EA]";
+
+const STEPS = [
+  { title: "Enquiry", copy: "Contact the clinic to ask about an appointment." },
+  { title: "Clinical assessment", copy: "Your concern is examined by the doctor." },
+  { title: "Discussion", copy: "Treatment options are explained to you." },
 ];
 
-const CARE_TRACKS = [
-  {
-    icon: Sparkles,
-    title: "Skin Care",
-    copy: "Acne, pigmentation, allergies & anti-aging",
-  },
-  {
-    icon: Scissors,
-    title: "Hair Care",
-    copy: "PRP, hair fall & transplant surgery",
-  },
-  {
-    icon: Zap,
-    title: "Laser Care",
-    copy: "Precision laser & cosmetic dermatology",
-  },
+const HEADLINE: { word: string; accent?: boolean }[] = [
+  { word: "Consultation" },
+  { word: "for" },
+  { word: "skin", accent: true },
+  { word: "&", accent: true },
+  { word: "hair", accent: true },
+  { word: "concerns." },
 ];
+
+/* ---------- small motion helpers ---------- */
+
+function Layer({
+  children,
+  className,
+  depth,
+  sx,
+  sy,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  depth: number;
+  sx: MotionValue<number>;
+  sy: MotionValue<number>;
+}) {
+  const x = useTransform(sx, (v) => v * depth);
+  const y = useTransform(sy, (v) => v * depth);
+  return (
+    <motion.div style={{ x, y }} className={className}>
+      {children}
+    </motion.div>
+  );
+}
+
+function Float({
+  children,
+  className,
+  amp = 8,
+  duration = 6,
+  delay = 0,
+  reduce,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  amp?: number;
+  duration?: number;
+  delay?: number;
+  reduce: boolean;
+}) {
+  return (
+    <motion.div
+      className={className}
+      animate={reduce ? undefined : { y: [-amp, amp] }}
+      transition={{
+        duration,
+        delay,
+        repeat: Infinity,
+        repeatType: "mirror",
+        ease: "easeInOut",
+      }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function Sparkle({
+  className,
+  size,
+  delay,
+  reduce,
+}: {
+  className: string;
+  size: number;
+  delay: number;
+  reduce: boolean;
+}) {
+  return (
+    <motion.svg
+      aria-hidden="true"
+      focusable="false"
+      viewBox="0 0 40 40"
+      width={size}
+      height={size}
+      className={className}
+      animate={
+        reduce
+          ? undefined
+          : { scale: [0.7, 1.15, 0.7], opacity: [0.5, 1, 0.5], rotate: [0, 18, 0] }
+      }
+      transition={{ duration: 3.4, delay, repeat: Infinity, ease: "easeInOut" }}
+    >
+      <path
+        d="M20 0 C21 12 28 19 40 20 C28 21 21 28 20 40 C19 28 12 21 0 20 C12 19 19 12 20 0Z"
+        fill="#7FE0EA"
+      />
+    </motion.svg>
+  );
+}
+
+function Aurora({
+  className,
+  dx,
+  dy,
+  duration,
+  reduce,
+}: {
+  className: string;
+  dx: number;
+  dy: number;
+  duration: number;
+  reduce: boolean;
+}) {
+  return (
+    <motion.div
+      aria-hidden="true"
+      className={`absolute rounded-full blur-3xl ${className}`}
+      animate={
+        reduce ? undefined : { x: [0, dx], y: [0, dy], scale: [1, 1.18] }
+      }
+      transition={{
+        duration,
+        repeat: Infinity,
+        repeatType: "mirror",
+        ease: "easeInOut",
+      }}
+    />
+  );
+}
+
+/* ---------- Hero ---------- */
 
 export function Hero() {
+  const prefersReduced = useReducedMotion();
+  const reduce = !!prefersReduced;
+
+  // Pointer parallax (-1 … 1), smoothed with a spring.
+  const mx = useMotionValue(0);
+  const my = useMotionValue(0);
+  const sx = useSpring(mx, { stiffness: 55, damping: 18 });
+  const sy = useSpring(my, { stiffness: 55, damping: 18 });
+
+  const onPointerMove = (e: React.PointerEvent<HTMLElement>) => {
+    if (reduce) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    mx.set(((e.clientX - r.left) / r.width - 0.5) * 2);
+    my.set(((e.clientY - r.top) / r.height - 0.5) * 2);
+  };
+  const onPointerLeave = () => {
+    mx.set(0);
+    my.set(0);
+  };
+
+  // One-time entrance. Opacity is never animated, so content is always visible.
+  const rise = (delay: number) =>
+    reduce
+      ? {}
+      : {
+          initial: { y: 18 },
+          animate: { y: 0 },
+          transition: { duration: 0.7, delay, ease: "easeOut" as const },
+        };
+
+  const { doctorName, qualifications, registration, address, hours, closedDay } =
+    CLINIC_FACTS;
+
   return (
-    <section className="relative min-h-screen overflow-hidden bg-[var(--color-ink)] pt-[var(--header-height)]">
-      {/* Ambient background */}
-      <div className="absolute inset-0">
-        <Image
-          src="/images/gallery/hero.png"
-          alt="Inside Dr. Anand Patil Skin & Cosmetic Laser Clinic, Latur"
-          fill
-          priority
-          className="object-cover opacity-[0.18]"
-          sizes="100vw"
+    <section
+      aria-labelledby="hero-heading"
+      onPointerMove={onPointerMove}
+      onPointerLeave={onPointerLeave}
+      className="relative overflow-hidden bg-[#06182E] pt-[var(--header-height)] text-white"
+    >
+      {/* Section-wide drifting light */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+        <Aurora
+          reduce={reduce}
+          dx={90}
+          dy={50}
+          duration={14}
+          className="-left-40 top-10 h-[520px] w-[520px] bg-[#0A8F8A]/25"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-ink)] via-[var(--color-ink)]/92 to-[var(--color-secondary)]/30" />
-        <div className="absolute inset-0 bg-clarity-grid opacity-[0.06]" />
-        {/* two restrained glows — signature stays with the diagnostic rings, not the background */}
-        <div className="absolute -left-32 top-1/3 h-[420px] w-[420px] rounded-full bg-[var(--color-secondary)]/20 blur-[120px]" />
-        <div className="absolute -right-24 bottom-0 h-[360px] w-[360px] rounded-full bg-[var(--color-accent)]/15 blur-[110px]" />
+        <Aurora
+          reduce={reduce}
+          dx={-80}
+          dy={-40}
+          duration={17}
+          className="-right-32 bottom-0 h-[560px] w-[560px] bg-[#0A6FB8]/30"
+        />
       </div>
 
-      <div className="relative mx-auto flex min-h-[calc(100vh-var(--header-height))] max-w-7xl flex-col justify-center px-6 py-16">
-        <div className="grid items-center gap-16 lg:grid-cols-[1.05fr_0.95fr]">
-          {/* ---------------- Left column ---------------- */}
-          <div>
-            <motion.div
-              initial={{ opacity: 0, x: -16 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6 }}
-              className="inline-flex items-center gap-2 rounded-full glass-panel px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white"
+      <div className="relative mx-auto max-w-[1280px] px-5 py-12 sm:px-8 sm:py-16 lg:px-10 lg:py-20">
+        <div className="grid items-center gap-14 lg:grid-cols-[11fr_9fr] lg:gap-10">
+          {/* ========================= Text ========================= */}
+          <div className="max-w-[680px]">
+            <motion.p
+              {...rise(0)}
+              className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#7FE0EA]"
             >
-              <Star className="h-3.5 w-3.5 fill-[var(--color-accent)] text-[var(--color-accent)]" />
-              24+ Years of Trusted Skin Care
-            </motion.div>
+              <span aria-hidden="true" className="h-px w-8 bg-[#7FE0EA]" />
+              Dermatology Clinic &middot; Latur
+            </motion.p>
 
-            <motion.h1
-  initial={{ opacity: 0, y: 24 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.7, delay: 0.1 }}
-  className="mt-6 text-[2.75rem] sm:text-6xl md:text-[4rem] font-display font-semibold leading-[1.03] tracking-tight text-white"
->
-  Healthy Skin.
-  <br />
-  <span className="text-gradient-clinic">Beautiful Confi</span>
-  <span className="text-[#E8C9A0]">dence.</span>
-</motion.h1>
+            <h1
+              id="hero-heading"
+              className="mt-6 font-display font-semibold tracking-tight"
+              style={{
+                fontSize: "clamp(2.5rem, 1.1rem + 5vw, 5.25rem)",
+                lineHeight: 1.03,
+              }}
+            >
+              {HEADLINE.map(({ word, accent }, i) => (
+                <motion.span
+                  key={`${word}-${i}`}
+                  {...rise(0.08 + i * 0.07)}
+                  className={`mr-[0.22em] inline-block ${
+                    accent ? "text-[#7FE0EA]" : ""
+                  }`}
+                >
+                  {word}
+                </motion.span>
+              ))}
+            </h1>
 
             <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.2 }}
-              className="mt-6 max-w-xl text-lg text-white/70 leading-relaxed"
+              {...rise(0.5)}
+              className="mt-7 max-w-[34rem] text-base leading-relaxed text-[#C9D8E6] sm:text-lg"
             >
-              Latur&rsquo;s trusted dermatology &amp; cosmetic laser clinic — led by{" "}
-              <span className="text-white font-medium">Dr. Anand Patil, MBBS, D.V.D(Dermatology,Venerology and leprosy)</span>.
-              From acne and pigmentation to hair transplant and laser care, every plan starts
-              with an accurate diagnosis.
+              Consultations for skin and hair concerns, with information about
+              treatment options following a clinical assessment.
             </motion.p>
-            <motion.div
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.7, delay: 0.25 }}
-  className="mt-4 flex flex-wrap gap-3"
->
-  <div className="rounded-full bg-white/10 px-4 py-2 text-sm text-white border border-white/10">
-    🕒 Clinic Hours: 11:00 AM – 6:00 PM
-  </div>
 
-  <div className="rounded-full bg-red-500/10 px-4 py-2 text-sm text-red-300 border border-red-500/20">
-    📅 Sunday: Holiday
-  </div>
-</motion.div>
-
+            {/* Doctor identification — factual details, shown only when verified */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.3 }}
-              className="mt-9 flex flex-col sm:flex-row gap-4"
+              {...rise(0.56)}
+              className="mt-7 border-l-2 border-[#5FD6D0] pl-4"
             >
-              <Button href="/contact" size="lg" icon={CalendarCheck}>
-                Book Appointment
-              </Button>
-              <Button
-                href={`tel:${SITE_CONFIG.contact.phonePrimaryRaw}`}
-                variant="outline"
-                size="lg"
-                icon={Phone}
-                iconPosition="left"
-                className="border-white/30 text-white hover:bg-white/10 hover:border-white transition-colors"
+              <p className="text-lg font-semibold leading-tight">{doctorName}</p>
+              {qualifications ? (
+                <p className="mt-1 text-sm text-[#C9D8E6]">{qualifications}</p>
+              ) : null}
+              {registration ? (
+                <p className="mt-0.5 text-sm text-[#C9D8E6]">{registration}</p>
+              ) : null}
+            </motion.div>
+
+            <motion.div
+              {...rise(0.62)}
+              className="mt-8 flex flex-col gap-3 sm:flex-row"
+            >
+              <Link
+                href="/contact"
+                className={`group inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full bg-[#5FD6D0] px-8 text-base font-semibold text-[#06182E] transition-colors hover:bg-[#8CE6E1] ${focusRing}`}
               >
-                Call Now
-              </Button>
+                Appointment Enquiry
+                <ArrowUpRight
+                  className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                  aria-hidden="true"
+                />
+              </Link>
+              <a
+                href={`tel:${SITE_CONFIG.contact.phonePrimaryRaw}`}
+                className={`inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full border border-white/40 px-8 text-base font-semibold text-white transition-colors hover:border-white hover:bg-white/10 ${focusRing}`}
+              >
+                <Phone className="h-4 w-4" aria-hidden="true" />
+                Contact Clinic
+                <span className="sr-only"> by phone</span>
+              </a>
             </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.7, delay: 0.45 }}
-              className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-3 text-white/70 text-sm"
-            >
-              {TRUST_ITEMS.map(({ icon: Icon, label }) => (
-                <div key={label} className="flex items-center gap-2">
-                  <Icon className="h-4 w-4 text-[var(--color-accent)]" />
-                  {label}
-                </div>
-              ))}
-            </motion.div>
-
-            {/* Care tracks */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.55 }}
-              className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-3"
-            >
-              {CARE_TRACKS.map(({ icon: Icon, title, copy }) => (
-                <div
-                  key={title}
-                  className="group rounded-2xl glass-panel px-4 py-4 transition-all hover:bg-white/[0.08] hover:-translate-y-1"
-                >
-                  <Icon className="h-5 w-5 text-[var(--color-accent)]" />
-                  <p className="mt-3 text-sm font-semibold text-white">{title}</p>
-                  <p className="mt-1 text-xs text-white/55 leading-snug">{copy}</p>
-                </div>
-              ))}
-            </motion.div>
-
-            {/* Stat strip */}
-            {/* <StatsCounter /> */}
           </div>
 
-          {/* ---------------- Right column: layered portrait ---------------- */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.94 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-            className="relative hidden lg:block"
-          >
-            {/* Diagnostic loupe rings — the signature element: concentric rings like a
-                dermatoscope viewfinder, slowly rotating, framing the portrait */}
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
-              className="absolute -inset-10 rounded-full border border-[var(--color-accent)]/25"
-            />
-            <motion.div
-              animate={{ rotate: -360 }}
-              transition={{ duration: 55, repeat: Infinity, ease: "linear" }}
-              className="absolute -inset-16 rounded-full border border-[var(--color-secondary)]/20 border-dashed"
-            />
+          {/* ========================= Orb ========================= */}
+          <div className="relative mx-auto aspect-square w-full max-w-[480px]">
+            {/* Aurora behind the logo */}
+            <Layer sx={sx} sy={sy} depth={10} className="absolute inset-0">
+              <Aurora
+                reduce={reduce}
+                dx={30}
+                dy={-24}
+                duration={8}
+                className="inset-[8%] bg-[#0A8F8A]/45"
+              />
+              <Aurora
+                reduce={reduce}
+                dx={-34}
+                dy={28}
+                duration={10}
+                className="inset-[18%] bg-[#00B4D0]/30"
+              />
+            </Layer>
 
-            <div className="relative rounded-[2rem] glass-panel p-3 shadow-[var(--shadow-lifted)]">
-              <div className="relative overflow-hidden rounded-[1.5rem]">
-                <Image
-                  src="/images/doctor/hero.jpg"
-                  alt="Dr. Anand Patil, D.V.D Dermatology, Latur"
-                  width={560}
-                  height={700}
-                 className="h-[560px] w-full object-cover object-center"
+            {/* Rings and crescent arcs */}
+            <Layer sx={sx} sy={sy} depth={16} className="absolute inset-0">
+              <svg
+                aria-hidden="true"
+                focusable="false"
+                viewBox="0 0 500 500"
+                className="absolute inset-0 h-full w-full"
+                fill="none"
+              >
+                <defs>
+                  <linearGradient id="hero-arc-a" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#00B4D0" />
+                    <stop offset="100%" stopColor="#0A6FB8" stopOpacity="0" />
+                  </linearGradient>
+                  <linearGradient id="hero-arc-b" x1="1" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#5FD6D0" />
+                    <stop offset="100%" stopColor="#0A8F8A" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <circle cx="250" cy="250" r="246" stroke="#7FE0EA" strokeOpacity="0.10" />
+                <circle cx="250" cy="250" r="206" stroke="#7FE0EA" strokeOpacity="0.08" />
+              </svg>
+
+              <motion.svg
+                aria-hidden="true"
+                focusable="false"
+                viewBox="0 0 500 500"
+                className="absolute inset-0 h-full w-full"
+                fill="none"
+                style={{ transformOrigin: "50% 50%" }}
+                animate={reduce ? undefined : { rotate: 360 }}
+                transition={{ duration: 70, repeat: Infinity, ease: "linear" }}
+              >
+                <circle
+                  cx="250"
+                  cy="250"
+                  r="236"
+                  stroke="url(#hero-arc-a)"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeDasharray="620 900"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-ink)]/40 via-transparent to-transparent" />
-              </div>
+              </motion.svg>
 
-              {/* Floating badge: experience */}
-              <motion.div
-                animate={{ y: [0, -8, 0] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute -bottom-6 -left-8 rounded-2xl bg-white p-5 shadow-[var(--shadow-lifted)] w-52"
+              <motion.svg
+                aria-hidden="true"
+                focusable="false"
+                viewBox="0 0 500 500"
+                className="absolute inset-0 h-full w-full"
+                fill="none"
+                style={{ transformOrigin: "50% 50%" }}
+                animate={reduce ? undefined : { rotate: -360 }}
+                transition={{ duration: 95, repeat: Infinity, ease: "linear" }}
               >
-                <p className="font-display text-3xl font-bold text-[var(--color-ink)]">24+</p>
-                <p className="text-xs text-[var(--color-muted)] mt-1">
-                  Years treating skin, hair &amp; laser cases in Latur
-                </p>
-              </motion.div>
+                <circle
+                  cx="250"
+                  cy="250"
+                  r="206"
+                  stroke="url(#hero-arc-b)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeDasharray="380 920"
+                />
+              </motion.svg>
+            </Layer>
 
-              {/* Floating badge: patients */}
-              <motion.div
-                animate={{ y: [0, 8, 0] }}
-                transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                className="absolute -top-6 -right-6 flex items-center gap-2 rounded-2xl bg-white px-4 py-3 shadow-[var(--shadow-lifted)]"
+            {/* Logo disc */}
+            <Layer sx={sx} sy={sy} depth={28} className="absolute inset-[20%]">
+              <Float reduce={reduce} amp={8} duration={6} className="h-full w-full">
+                <div className="flex h-full w-full items-center justify-center rounded-full bg-white p-[9%] shadow-[0_0_90px_-10px_rgba(95,214,208,0.6)]">
+                  <Image
+                    src={LOGO_SRC}
+                    alt="Dr. Anand Patil Skin & Cosmetic Laser Clinic logo"
+                    width={400}
+                    height={400}
+                    priority
+                    sizes="(min-width: 1024px) 220px, 180px"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+              </Float>
+            </Layer>
+
+            {/* Sparkles (echo the logo) */}
+            <Sparkle
+              reduce={reduce}
+              size={34}
+              delay={0}
+              className="absolute right-[10%] top-[12%]"
+            />
+            <Sparkle
+              reduce={reduce}
+              size={20}
+              delay={1.1}
+              className="absolute right-[3%] top-[28%]"
+            />
+            <Sparkle
+              reduce={reduce}
+              size={24}
+              delay={2}
+              className="absolute bottom-[26%] left-[6%]"
+            />
+
+            {/* Factual info chips */}
+            <Layer sx={sx} sy={sy} depth={44} className="absolute inset-0">
+              {/* Hours — carried over from existing site; pending clinic confirmation */}
+              <Float
+                reduce={reduce}
+                amp={6}
+                duration={5}
+                delay={0.4}
+                className="absolute bottom-[2%] left-0"
               >
-                <ShieldCheck className="h-5 w-5 text-[var(--color-secondary)]" />
+                <div className="flex items-center gap-3 rounded-2xl border border-[#1F4A73] bg-[#0D2A4A] px-4 py-3 shadow-[0_18px_40px_-18px_rgba(0,0,0,0.7)]">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0B7F7B]">
+                    <Clock className="h-4 w-4 text-white" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9FB6CC]">
+                      Clinic hours
+                    </p>
+                    <p className="text-sm font-semibold leading-tight">{hours}</p>
+                    <p className="text-xs text-[#C9D8E6]">{closedDay}</p>
+                  </div>
+                </div>
+              </Float>
+
+              <Float
+                reduce={reduce}
+                amp={6}
+                duration={5.6}
+                delay={1.2}
+                className="absolute right-0 top-[44%]"
+              >
+                <div className="flex max-w-[250px] items-center gap-3 rounded-2xl border border-[#1F4A73] bg-[#0D2A4A] px-4 py-3 shadow-[0_18px_40px_-18px_rgba(0,0,0,0.7)]">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0A6FB8]">
+                    <MapPin className="h-4 w-4 text-white" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9FB6CC]">
+                      {address ? "Address" : "Location"}
+                    </p>
+                    <p className="text-sm font-semibold leading-tight">
+                      {address || "Latur, Maharashtra"}
+                    </p>
+                  </div>
+                </div>
+              </Float>
+            </Layer>
+          </div>
+        </div>
+
+        {/* ===================== Consultation steps ===================== */}
+        <div className="relative mt-14 lg:mt-16">
+          <motion.div
+            aria-hidden="true"
+            className="absolute left-0 right-0 top-0 h-px origin-left bg-gradient-to-r from-[#5FD6D0] via-[#5FD6D0]/40 to-transparent"
+            initial={reduce ? false : { scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            transition={{ duration: 1.3, delay: 0.6, ease: "easeOut" }}
+          />
+          <p className="pt-6 text-xs font-semibold uppercase tracking-[0.18em] text-[#7FE0EA]">
+            How a consultation works
+          </p>
+          <ol className="mt-5 grid gap-6 sm:grid-cols-3 sm:gap-8">
+            {STEPS.map((step, i) => (
+              <motion.li
+                key={step.title}
+                {...rise(0.8 + i * 0.1)}
+                className="flex gap-4"
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#5FD6D0]/60 text-sm font-semibold text-[#7FE0EA]"
+                >
+                  {i + 1}
+                </span>
                 <div>
-                  <p className="text-sm font-semibold text-[var(--color-ink)] leading-none">
-                    50K+ Patients
+                  <p className="text-base font-semibold">{step.title}</p>
+                  <p className="mt-1 text-sm leading-snug text-[#C9D8E6]">
+                    {step.copy}
                   </p>
-                  <p className="text-[11px] text-[var(--color-muted)] mt-0.5">Safe procedures</p>
                 </div>
-              </motion.div>
-
-              {/* Floating review card */}
-              <motion.div
-                animate={{ y: [0, -6, 0] }}
-                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                className="absolute top-1/3 -right-10 w-48 rounded-2xl bg-white p-4 shadow-[var(--shadow-lifted)]"
-              >
-                <div className="flex items-center gap-0.5">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star key={i} className="h-3 w-3 fill-[var(--color-accent)] text-[var(--color-accent)]" />
-                  ))}
-                </div>
-                <p className="mt-2 text-xs font-medium text-[var(--color-ink)] leading-snug">
-                  &ldquo;Excellent experience, very professional.&rdquo;
-                </p>
-                <div className="mt-2 flex items-center gap-1 text-[10px] text-[var(--color-muted)]">
-                  <Quote className="h-3 w-3" />
-                  Google Verified
-                </div>
-              </motion.div>
-
-              {/* Bottom consultation card */}
-              <div className="absolute -bottom-8 right-6 rounded-2xl bg-[var(--color-ink)] px-5 py-4 shadow-[var(--shadow-lifted)] w-56">
-                <p className="text-[11px] uppercase tracking-wide text-[var(--color-accent)] font-semibold">
-                  Today&rsquo;s Consultation
-                </p>
-                <p className="mt-1 text-sm text-white/80">
-                  Skin &middot; Laser &middot; Hair Analysis
-                </p>
-              </div>
-            </div>
-          </motion.div>
+              </motion.li>
+            ))}
+          </ol>
         </div>
       </div>
     </section>
